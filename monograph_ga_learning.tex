@@ -420,6 +420,16 @@ between all token pairs at a fixed layer.  Plot it as a heatmap.
 Then compare heatmaps from an early layer ($l = 2$) and a late layer
 ($l = 26$).  Tokens become more similar in late layers as the model
 converges toward a prediction.
+
+\medskip
+\textbf{Sample output} (Qwen2.5-7B, prompt: ``The capital of France is''):
+
+\begin{center}
+\includegraphics[width=0.95\linewidth]{figures_ga_learning/ch01_cosine_layers.pdf}
+\captionof{figure}{Cosine similarity between tokens at an early and late layer.
+In the late layer, tokens cluster toward higher similarity as the model
+converges on its prediction.}
+\end{center}
 \end{tryit}
 
 
@@ -579,6 +589,20 @@ print(f"Reconstruction error: "
 \item Find two vectors where the geometric product is pure bivector (no
   scalar).  What does this mean?
 \end{enumerate}
+
+\medskip
+\textbf{Sample output:}
+\begin{itemize}[nosep]
+\item Perpendicular vectors: scalar $= 0.0000$, bivector norm $= 1.4142$
+\item Parallel vectors: scalar $= 3.0000$, bivector norm $= 0.0000$
+\end{itemize}
+As the angle between two unit vectors sweeps from $0^\circ$ to $90^\circ$, the scalar part decreases and the bivector norm increases:
+
+\begin{center}
+\includegraphics[width=0.75\linewidth]{figures_ga_learning/ch02_scalar_vs_bivector.pdf}
+\captionof{figure}{Geometric product decomposition: scalar (grade-0) vs.\
+bivector (grade-2) content as a function of angle.}
+\end{center}
 \end{tryit}
 
 
@@ -709,6 +733,20 @@ $\|U - I\|_F$ --- they require the bivector.
 \item Extract the bivectors from a real transformer analysis.  How many
   significant principal planes does each layer's bivector have?
 \end{enumerate}
+
+\medskip
+\textbf{Sample output:}
+A simple bivector $e_1 \op e_2$ has exactly 1 significant plane.
+A compound bivector $0.7\,(e_1 \op e_2) + 0.5\,(e_3 \op e_4)$ decomposes into
+two planes with weights $0.70$ and $0.50$.  A random bivector in $\mathbb{R}^8$
+distributes weight across all four planes:
+
+\begin{center}
+\includegraphics[width=0.65\linewidth]{figures_ga_learning/ch03_principal_planes.pdf}
+\captionof{figure}{Principal plane decomposition of a random bivector in
+$\mathbb{R}^8$.  In $\mathbb{R}^{256}$, transformer bivectors typically
+have 3--5 dominant planes.}
+\end{center}
 \end{tryit}
 
 
@@ -824,6 +862,18 @@ at $k = 64$.
 and after whitening.  Visualize both as heatmaps.  The before-whitening
 heatmap should show strong off-diagonal structure; the after-whitening
 heatmap should be nearly diagonal.
+
+\medskip
+\textbf{Sample output} (Qwen2.5-7B):
+After whitening, the diagonal mean is $1.0000$ and the mean absolute
+off-diagonal entry drops to $0.000002$ --- confirming a valid orthonormal frame.
+
+\begin{center}
+\includegraphics[width=0.95\linewidth]{figures_ga_learning/ch04_covariance.pdf}
+\captionof{figure}{Covariance structure before and after whitening.  The
+raw hidden states have heavy correlations; after whitening, the covariance
+is nearly identity.}
+\end{center}
 \end{tryit}
 
 
@@ -951,6 +1001,15 @@ Chapter~\ref{chap:versor} shows how to extract it from real data.
 \item Compose two rotors in perpendicular planes.  Extract the
   principal planes of the composed rotor.  What do you see?
 \end{enumerate}
+
+\medskip
+\textbf{Sample output:}
+\begin{itemize}[nosep]
+\item Random rotor: angle $= 0.889$ rad, $\|v\| = 2.6387$, $\|Rv\| = 2.6387$ (norm preserved)
+\item $45^\circ$ rotation of $e_1$: $[0.7071, 0.7071, \ldots]$ as expected
+\item Composition: $R$ (angle $0.889$), $R_2$ (angle $0.668$), $R_1 R_2$ (angle $0.983$)
+\item $R R^{-1}$ deviation from identity: $5.2 \times 10^{-16}$
+\end{itemize}
 \end{tryit}
 
 
@@ -1061,6 +1120,23 @@ controlled by \emph{what it amplifies}, not \emph{where it points}.
 \textbf{Notebook: Chapter 6.}  Plot the grade-0 and grade-2 content
 side by side for each layer.  At which layer does grade-0 begin to
 dominate?  Compare two prompts: does the crossover point change?
+
+\medskip
+\textbf{Sample output} (Qwen2.5-7B, 27 layer transitions):
+Peak rotation angle at layer~1 ($4.28$ rad).
+Mean grade-0 norm: $2.24$; mean grade-2 norm: $5.30$.
+
+\begin{center}
+\includegraphics[width=0.85\linewidth]{figures_ga_learning/ch06_rotor_angles.pdf}
+\captionof{figure}{Rotor angle profile across layers.  Early layers perform
+the largest rotations.}
+\end{center}
+
+\begin{center}
+\includegraphics[width=0.95\linewidth]{figures_ga_learning/ch06_grade_profile.pdf}
+\captionof{figure}{Grade profile: grade-0 (stretch, green) vs.\ grade-2
+(rotation, purple) at each layer transition.}
+\end{center}
 \end{tryit}
 
 
@@ -1148,6 +1224,22 @@ operations.
 \item Compare the plane similarity matrix for an arithmetic prompt vs.\
   a reasoning prompt.  Do they use different planes?
 \end{enumerate}
+
+\medskip
+\textbf{Sample output} (Qwen2.5-7B):
+
+\begin{center}
+\includegraphics[width=0.85\linewidth]{figures_ga_learning/ch07_plane_evolution.pdf}
+\captionof{figure}{Bivector plane evolution: the top-3 principal plane weights
+as a stacked area chart across layers.  The dominant plane shifts around
+mid-network.}
+\end{center}
+
+\begin{center}
+\includegraphics[width=0.6\linewidth]{figures_ga_learning/ch07_plane_similarity.pdf}
+\captionof{figure}{Bivector similarity heatmap between all layer pairs.
+Block structure reveals groups of layers that rotate in similar planes.}
+\end{center}
 \end{tryit}
 
 
@@ -1240,6 +1332,22 @@ information to propagate to the final prediction.
 \item Compare eigenvalue spectra for two prompts.  Do the same
   directions get amplified?
 \end{enumerate}
+
+\medskip
+\textbf{Sample output} (Qwen2.5-7B):
+
+\begin{center}
+\includegraphics[width=0.95\linewidth]{figures_ga_learning/ch08_eigenvalue_spectra.pdf}
+\captionof{figure}{Eigenvalue spectra at early, middle, and late layers.
+Late layers show highly peaked spectra --- a few directions carry almost all
+the signal.}
+\end{center}
+
+\begin{center}
+\includegraphics[width=0.85\linewidth]{figures_ga_learning/ch08_kappa_erank.pdf}
+\captionof{figure}{Condition number $\kappa$ (selectivity) and effective rank
+across layers.  Late layers are most selective.}
+\end{center}
 \end{tryit}
 
 
@@ -1347,6 +1455,20 @@ varies with prompt type and model architecture.
   $\|[\bivec{l}, \bivec{l+1}]\|_F$.  Where is non-commutativity
   strongest?
 \end{enumerate}
+
+\medskip
+\textbf{Sample output:}
+\begin{itemize}[nosep]
+\item $\|[B_1, B_2]\|_F = 0.571$; antisymmetry: $[B_1, B_2] = -[B_2, B_1]$ \checkmark
+\item Self-commutator norm: $0.0$; Jacobi identity residual: $9.5 \times 10^{-17}$
+\end{itemize}
+
+\begin{center}
+\includegraphics[width=0.6\linewidth]{figures_ga_learning/ch09_commutator_heatmap.pdf}
+\captionof{figure}{Commutator norm $\|[B_i, B_j]\|_F$ for all layer pairs
+in Qwen2.5-7B.  Block structure reveals which groups of layers
+interact non-commutatively.}
+\end{center}
 \end{tryit}
 
 
@@ -1453,6 +1575,16 @@ token-specific computation.
 \item Compare holonomy maps for two prompts.  Do the curvature patterns
   differ in location, magnitude, or direction?
 \end{enumerate}
+
+\medskip
+\textbf{Sample output} (Qwen2.5-7B):
+Peak curvature at layer~16 (mean curvature $= 2.47$).
+
+\begin{center}
+\includegraphics[width=0.95\linewidth]{figures_ga_learning/ch10_holonomy.pdf}
+\captionof{figure}{Left: holonomy scalar curvature map (layer $\times$ token).
+Right: mean curvature by layer, peaking at layer~16.}
+\end{center}
 \end{tryit}
 
 
@@ -1540,6 +1672,17 @@ non-commutativity in planes that do not contribute to performance.
 \item Decompose the commutator structure into principal planes.  How
   many planes capture 90\% of the total norm?
 \end{enumerate}
+
+\medskip
+\textbf{Sample output} (Qwen2.5-7B):
+$C_{\mathrm{acc}} = 3771.3$, concentration $= 0.205$.
+
+\begin{center}
+\includegraphics[width=0.8\linewidth]{figures_ga_learning/ch11_capacity.pdf}
+\captionof{figure}{Per-layer capacity contributions
+$\|[\bivec{l}, \bivec{l+1}]\|_F$.  Capacity is not uniformly distributed ---
+some layer pairs contribute far more non-commutativity than others.}
+\end{center}
 \end{tryit}
 
 
@@ -1635,6 +1778,18 @@ understand a failure, look at what these planes are doing.
 \item For the top-3 effective-work layers, are the dominant rotation
   planes similar across prompts, or prompt-specific?
 \end{enumerate}
+
+\medskip
+\textbf{Sample output} (Qwen2.5-7B):
+$D_{\mathrm{total}} = 1.74$, entropy $= 2.61$.
+Top-3 effective-work layers: 0, 1, 2 --- the earliest layers carry the
+heaviest dependency-weighted rotation.
+
+\begin{center}
+\includegraphics[width=0.95\linewidth]{figures_ga_learning/ch12_dependency.pdf}
+\captionof{figure}{Left: dependency $D_l$ (bars) and rotor angle (line).
+Right: effective work $D_l \times \theta_l$ with top-3 layers highlighted.}
+\end{center}
 \end{tryit}
 
 
@@ -1724,6 +1879,17 @@ targeted.
 \item Identify the top-2 steering targets (layer + plane) for a given
   prompt.
 \end{enumerate}
+
+\medskip
+\textbf{Sample output} --- the GA summary plot brings together all four
+diagnostic dimensions in a single view:
+
+\begin{center}
+\includegraphics[width=0.95\linewidth]{figures_ga_learning/ch13_ga_summary.pdf}
+\captionof{figure}{4-panel GA summary for Qwen2.5-7B on ``The capital of
+France is''.  Top-left: rotor angles.  Top-right: plane similarity.
+Bottom-left: curvature map.  Bottom-right: capacity contributions.}
+\end{center}
 \end{tryit}
 
 
