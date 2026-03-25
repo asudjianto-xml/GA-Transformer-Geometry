@@ -411,7 +411,10 @@ section("Chapter 10: Holonomy")
 
 from layer_time_ga.curvature import holonomy_scalar_map, holonomy_rotor
 
-holo_map = holonomy_scalar_map(result.H_whitened)
+# Use a longer prompt so the layer x token heatmap is informative
+ch10_prompt = "The Eiffel Tower is a wrought iron lattice tower in Paris France"
+result_ch10 = ltg_ga.analyse(ch10_prompt, model=model)
+holo_map = holonomy_scalar_map(result_ch10.H_whitened)
 
 fig, axes = plt.subplots(1, 2, figsize=(14, 5))
 im = axes[0].imshow(holo_map, aspect='auto', cmap='YlOrRd', origin='lower')
