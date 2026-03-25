@@ -194,14 +194,22 @@ print(f"Loaded {model.name}: {model.n_layers} layers, dim={model.hidden_dim}")
 # ── Chapter 1: Cosine similarity heatmaps ─────────────────────
 section("Chapter 1: Cosine Similarity Across Layers")
 
+# Use a longer prompt so the token-token structure is visible
+import layer_time_geometry as core
+ch1_prompt = "The Eiffel Tower is a wrought iron lattice tower in Paris France"
+H_raw_ch1 = core.extract_hidden_states(model.hf_model, model.tokenizer,
+                                        ch1_prompt, model.device)
+H_ch1 = H_raw_ch1[1:].cpu().numpy()  # raw (unwhitened) to show convergence
+L_ch1, T_ch1, _ = H_ch1.shape
+print(f"Ch1 grid: {L_ch1} layers x {T_ch1} tokens")
+
+# Also run the standard analysis for later chapters
 result = ltg_ga.analyse("The capital of France is", model=model)
-H = result.H_whitened
-L, T, k = H.shape
-print(f"Grid: {L} layers x {T} tokens x {k} dims")
 
 fig, axes = plt.subplots(1, 2, figsize=(12, 5))
-for ax, layer_idx, title in zip(axes, [1, L-2], ['Early (Layer 2)', f'Late (Layer {L-1})']):
-    H_l = H[layer_idx]
+for ax, layer_idx, title in zip(axes, [1, L_ch1-2],
+                                ['Early (Layer 2)', f'Late (Layer {L_ch1-1})']):
+    H_l = H_ch1[layer_idx]
     norms = np.linalg.norm(H_l, axis=1, keepdims=True)
     H_norm = H_l / (norms + 1e-12)
     cos_sim = H_norm @ H_norm.T
