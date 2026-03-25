@@ -865,14 +865,16 @@ heatmap should be nearly diagonal.
 
 \medskip
 \textbf{Sample output} (Qwen2.5-7B):
-After whitening, the diagonal mean is $1.0000$ and the mean absolute
-off-diagonal entry drops to $0.000002$ --- confirming a valid orthonormal frame.
+The raw correlation matrix shows a mean $|\text{off-diagonal}| = 0.34$ ---
+heavy spurious correlations.  After whitening, this drops to $10^{-6}$
+with diagonal mean exactly $1.0$, confirming a valid orthonormal frame.
 
 \begin{center}
 \includegraphics[width=0.95\linewidth]{figures_ga_learning/ch04_covariance.pdf}
-\captionof{figure}{Covariance structure before and after whitening.  The
-raw hidden states have heavy correlations; after whitening, the covariance
-is nearly identity.}
+\captionof{figure}{Correlation matrices before and after whitening (first
+100 dimensions).  Left: raw hidden states show pervasive off-diagonal
+structure.  Right: after whitening, the matrix is effectively identity ---
+establishing the orthonormal frame that GA requires.}
 \end{center}
 \end{tryit}
 
