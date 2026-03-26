@@ -284,9 +284,44 @@ build intuition.
 
 \subsection*{The software}
 
-All code uses the \texttt{layer\_time\_ga} Python package, which wraps
-a standard PyTorch/NumPy backend with GA semantics.  The student API
-\texttt{ltg\_ga} provides a simple interface:
+All code in this book uses the \texttt{ga-transformer-geometry} package,
+available on GitHub:
+
+\begin{center}
+\url{https://github.com/asudjianto-xml/GA-Transformer-Geometry}
+\end{center}
+
+\noindent Install from PyPI:
+\begin{lstlisting}
+pip install ga-transformer-geometry
+\end{lstlisting}
+
+\noindent Or install from source:
+\begin{lstlisting}
+git clone https://github.com/asudjianto-xml/GA-Transformer-Geometry.git
+cd GA-Transformer-Geometry
+pip install -e .
+\end{lstlisting}
+
+\noindent For the companion notebooks, install with tutorial dependencies:
+\begin{lstlisting}
+pip install -e ".[tutorials]"
+\end{lstlisting}
+
+The package provides two interfaces:
+
+\begin{itemize}[nosep]
+\item \textbf{\texttt{layer\_time\_ga}} --- the GA library with 34 public
+  functions and classes across five modules: \texttt{algebra} (bivectors,
+  rotors, geometric product, Rodrigues, Cayley, Binet--Cauchy),
+  \texttt{decomposition} (versor decomposition, rotor fields),
+  \texttt{curvature} (holonomy, commutators, nonseparability),
+  \texttt{capacity} (GA capacity profiles), and \texttt{diagnostics}
+  (coherence, steering).  Every code block in the book calls this library.
+
+\item \textbf{\texttt{ltg\_ga}} --- a student API that wraps the full
+  pipeline into three lines:
+\end{itemize}
 
 \begin{lstlisting}[caption={Three lines to GA}]
 import ltg_ga
