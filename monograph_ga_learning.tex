@@ -2990,28 +2990,102 @@ starting point for all subsequent computation.
 \section{The architecture}
 
 A transformer consists of $L$ identical layers stacked sequentially.
-Each layer transforms the hidden state $H^{(l,t)} \to H^{(l+1,t)}$.
-Each layer has two main sub-components:
+Each layer transforms the hidden state $H^{(l,t)} \to H^{(l+1,t)}$
+through two sub-components applied in sequence: self-attention and a
+feed-forward network.
 
-\begin{enumerate}[nosep]
-\item \textbf{Self-attention}: Each token ``looks at'' all other tokens
-  and computes a weighted average of their representations.  This is
-  the mechanism by which tokens communicate --- information from one
-  position can influence another.  Attention enables context-dependent
-  processing: the same word is represented differently depending on
-  its neighbours.
+\subsection*{Self-attention}
 
-\item \textbf{Feed-forward network (MLP)}: A two-layer neural network
-  applied to each token independently.  This is the model's
-  ``thinking'' step for each token, combining and transforming
-  features without inter-token communication.
-\end{enumerate}
+Self-attention is the mechanism by which tokens communicate.  At each
+layer, every token ``looks at'' all other tokens and computes a
+weighted combination of their representations.  Here is the math.
+
+Each hidden state $H^{(l,t)} \in \mathbb{R}^p$ is projected through
+three learned matrices to produce a \textbf{query}, \textbf{key}, and
+\textbf{value}:
+\[
+  q_t = W_Q \, H^{(l,t)}, \qquad
+  k_t = W_K \, H^{(l,t)}, \qquad
+  v_t = W_V \, H^{(l,t)}
+\]
+where $W_Q, W_K \in \mathbb{R}^{d_k \times p}$ and
+$W_V \in \mathbb{R}^{d_v \times p}$ are learned weight matrices, and
+$d_k, d_v$ are the query/key and value dimensions
+(typically $d_k = d_v = p / n_{\text{heads}}$).
+
+Think of it this way: the query $q_t$ asks ``what am I looking for?'',
+the key $k_s$ says ``here is what I contain,'' and the value $v_s$ says
+``here is the information I provide if selected.''
+
+The \textbf{attention weight} from token $t$ to token $s$ measures how
+well the query matches the key:
+\[
+  \alpha_{t,s} = \frac{\exp(q_t^\top k_s \,/\, \sqrt{d_k})}
+                      {\sum_{r \le t} \exp(q_t^\top k_r \,/\, \sqrt{d_k})}
+\]
+The division by $\sqrt{d_k}$ prevents the dot products from growing too
+large in high dimensions.  The $\exp$ and normalisation (a
+\textbf{softmax}) turn the raw scores into probabilities that sum to~1.
+The constraint $r \le t$ is the \textbf{causal mask}: token $t$ can
+only attend to tokens at or before its own position (not to future
+tokens).
+
+The attention output for token $t$ is the weighted sum of values:
+\[
+  \mathrm{Attn}(t) = \sum_{s \le t} \alpha_{t,s} \, v_s
+\]
+
+In practice, transformers use \textbf{multi-head attention}: the
+projection is split into $n_{\text{heads}}$ independent ``heads,'' each
+with its own $W_Q, W_K, W_V$ matrices of smaller dimension.  Each head
+can attend to different aspects of the input (one head might track
+syntactic relationships while another tracks semantic similarity).
+The outputs of all heads are concatenated and projected back to
+$\mathbb{R}^p$:
+\[
+  \mathrm{MultiHead}(t) = W_O \,
+    \begin{bmatrix} \mathrm{head}_1(t) \\ \vdots \\ \mathrm{head}_{n_h}(t) \end{bmatrix}
+\]
+where $W_O \in \mathbb{R}^{p \times p}$ is a learned output projection.
+
+The result: each token's representation is updated based on all tokens
+that precede it.  The same word is represented differently depending on
+its context --- ``bank'' in ``river bank'' vs.\ ``bank account'' will
+have different hidden states after attention.
+
+\subsection*{Feed-forward network (MLP)}
+
+After attention, each token is processed \emph{independently} by a
+two-layer neural network:
+\[
+  \mathrm{FFN}(x) = W_2 \;\sigma(W_1 \, x + b_1) + b_2
+\]
+where $W_1 \in \mathbb{R}^{d_{\mathrm{ff}} \times p}$ and
+$W_2 \in \mathbb{R}^{p \times d_{\mathrm{ff}}}$ are learned weight
+matrices, $b_1, b_2$ are biases, and $\sigma$ is a nonlinear
+activation function (modern transformers typically use
+SiLU or GELU).  The intermediate dimension
+$d_{\mathrm{ff}}$ is usually $4p$ or larger ($d_{\mathrm{ff}} = 18944$
+for Qwen2.5-7B).
+
+The MLP is the model's ``thinking'' step for each token --- it combines
+and transforms features without inter-token communication.
+
+\subsection*{Residual connections and layer normalisation}
 
 Both sub-components use \textbf{residual connections}: the output is
-added to the input, $H^{(l+1)} = H^{(l)} + \Delta H^{(l)}$.  This
-means the hidden state accumulates changes layer by layer rather than
-being overwritten.  \textbf{Layer normalization} stabilizes the scale
-of representations.
+added to the input rather than replacing it:
+\[
+  H^{(l+1,t)} = H^{(l,t)} + \mathrm{Attn}^{(l)}(t) + \mathrm{FFN}^{(l)}(t)
+\]
+This means the hidden state \emph{accumulates} changes layer by layer
+rather than being overwritten.  The residual structure is what makes the
+hidden-state grid continuous enough for GA to work: adjacent layers
+differ by a small additive update.
+
+\textbf{Layer normalisation} (applied before each sub-component)
+rescales the hidden state to have zero mean and unit variance across
+its dimensions, stabilising training.
 
 The hidden state $H^{(l, t)} \in \mathbb{R}^p$ at layer $l$ and token
 position $t$ is the model's internal representation --- the central
