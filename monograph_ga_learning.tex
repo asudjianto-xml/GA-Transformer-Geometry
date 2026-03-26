@@ -985,6 +985,46 @@ R_id = rotor_compose(R, R_inv)
 print(f"R * R^-1 deviation: {R_id.deviation_from_identity():.2e}")
 \end{lstlisting}
 
+\subsection*{Rodrigues' formula: rotating one vector to another}
+
+There is a third construction that is especially natural when your
+starting data is \emph{two vectors} rather than a matrix.  Given unit
+vectors $\hat{u}$ and $\hat{v}$, the \textbf{Rodrigues rotation} is the
+unique rotation in the $\hat{u} \op \hat{v}$ plane that sends $\hat{u}$
+to $\hat{v}$:
+
+\begin{gabox}
+\textbf{Rodrigues' rotation formula.}
+Let $\hat{B} = (\hat{u} \op \hat{v}) / \|\hat{u} \op \hat{v}\|$ be the
+unit bivector in the plane of $\hat{u}$ and $\hat{v}$, and
+$\theta = \arccos(\hat{u}^\top \hat{v})$ the angle between them.  Then:
+\[
+  R = I + \sin\theta \; \hat{B} + (1 - \cos\theta) \; \hat{B}^2
+\]
+This is the matrix form of the rotor $R = \exp(-\hat{B}\theta/2)$,
+expanded via Euler's formula.
+\end{gabox}
+
+\paragraph{Why three methods?}
+You now have three ways to extract a rotation's bivector generator:
+\begin{enumerate}[nosep]
+\item \textbf{Matrix logarithm}: $U \xrightarrow{\log} B\theta$.  Exact,
+  handles multiple planes, but requires an $O(k^3)$ matrix logarithm.
+\item \textbf{Cayley map}: $A = (U-I)(U+I)^{-1}$.  Algebraic (no
+  transcendental functions), returns $B\tan(\theta/2)$.  Fails if $U$
+  has eigenvalue $-1$ (i.e., a $180^\circ$ rotation).
+\item \textbf{Rodrigues}: direct from two vectors, exact for any angle,
+  $O(k^2)$.  But only handles a single rotation plane.
+\end{enumerate}
+
+In practice: use the \textbf{matrix logarithm} for layer transition
+operators (which have multiple rotation planes), and
+\textbf{Rodrigues or Cayley} when comparing two hidden-state vectors
+(which define a single plane).  Chapter~\ref{chap:applications} uses
+the Cayley form; the transport operators in
+Chapter~\ref{chap:holonomy} use Rodrigues because it is exact even for
+the large angles ($>60^\circ$) that arise at the embedding layer.
+
 \begin{transformer}
 Every layer transition in a transformer contains a rotation.  The rotor
 at layer $l$ has a bivector $\bivec{l}$ encoding which planes the layer
@@ -1091,6 +1131,61 @@ $\mathrm{erank}^{(l)}$ measures how many directions are actively used.
 It decreases from early to late layers: the representation concentrates
 into a lower-dimensional subspace.
 \end{finding}
+
+\section{The three-phase structure}
+
+When you look at all three signatures together --- rotation angles,
+condition numbers, and effective ranks --- a consistent pattern emerges
+across different models and prompts.  The rotor field naturally divides
+into three computational phases:
+
+\begin{gabox}
+\textbf{Three-phase structure of the rotor field.}
+\begin{enumerate}[nosep]
+\item \textbf{Early layers (embedding phase).}  Large rotation angles,
+  low condition numbers ($\kappa \approx 1$--$3$), high effective rank.
+  The model rotates raw embeddings into a shared geometric frame ---
+  primarily a \emph{grade-2} operation (rotation).
+\item \textbf{Middle layers (interaction phase).}  Moderate rotation,
+  rising $\kappa$, curvature peaks.  This is where layer and token
+  operations fail to commute (Chapter~\ref{chap:holonomy}), producing
+  the non-separable computation that distinguishes reasoning from lookup.
+  Both grade-0 and grade-2 contribute.
+\item \textbf{Late layers (readout phase).}  Small rotation, large
+  $\kappa$ (high selectivity), low effective rank.  The model
+  concentrates onto a few directions for the final prediction ---
+  primarily a \emph{grade-0} operation (stretching).
+\end{enumerate}
+\end{gabox}
+
+The transition between phases is not arbitrary --- it reflects a shift
+in which \emph{grade} of the geometric product dominates the dynamics.
+
+\section{The directional flow ratio}
+
+To quantify the grade balance at each layer, we define:
+\[
+  \mathcal{R}^{(l)} = \frac{\|A^{(l)}\|_F}{\|S^{(l)}\|_F + \epsilon}
+\]
+where $A^{(l)} = \frac{1}{2}(T^{(l)} - T^{(l)\top})$ is the
+\textbf{antisymmetric part} (grade-2, bivector) and
+$S^{(l)} = \frac{1}{2}(T^{(l)} + T^{(l)\top})$ is the
+\textbf{symmetric part} (grade-0, metric) of the layer transition
+operator.
+
+\begin{keyidea}
+The directional flow ratio $\mathcal{R}^{(l)}$ is the grade-2--to--grade-0
+ratio at each layer.
+\begin{itemize}[nosep]
+\item $\mathcal{R} \gg 1$: rotation dominates (changing direction).
+\item $\mathcal{R} \ll 1$: stretching dominates (changing scale).
+\item $\mathcal{R} \approx 1$: both contribute equally.
+\end{itemize}
+Plotting $\mathcal{R}^{(l)}$ across layers makes the three-phase
+structure visible in a single curve.  Typically,
+$\mathcal{R} \sim 0.03$--$0.06$ overall (metric-dominated), but the
+ratio is higher in early layers and drops in late layers.
+\end{keyidea}
 
 \section{Grade-0 vs grade-2: which dominates?}
 
@@ -1401,6 +1496,51 @@ $[B_1, B_2] = 0$, they commute (order does not matter).  If not, the
 commutator bivector names the plane of disagreement.
 \end{gabox}
 
+\section{Why commutators matter: the Baker--Campbell--Hausdorff formula}
+
+The commutator is not merely a mathematical curiosity.  It appears
+necessarily whenever you compose two rotations.  This is the content of
+the \textbf{Baker--Campbell--Hausdorff (BCH) formula}:
+
+\begin{gabox}
+\textbf{Baker--Campbell--Hausdorff formula.}
+If $B_1$ and $B_2$ are bivectors, then the composed rotation
+$\exp(B_1)\exp(B_2) = \exp(B_{12})$ has generator:
+\[
+  B_{12} = B_1 + B_2 + \tfrac{1}{2}[B_1, B_2]
+    + \tfrac{1}{12}\bigl([B_1, [B_1, B_2]] - [B_2, [B_1, B_2]]\bigr)
+    + \cdots
+\]
+The first two terms are the ``na\"ive sum''; all corrections involve
+commutators.
+\end{gabox}
+
+\paragraph{What this means in plain language.}
+When two layers rotate in the \emph{same} plane, their bivectors add
+and the commutator vanishes --- composing is simple.  When they rotate
+in \emph{different} planes, the commutator is the leading correction
+that tells you how the composed rotation differs from a na\"ive sum.
+The larger the commutator, the more the composition ``surprises'' you.
+
+\paragraph{Connection to the rotor field.}
+Recall from Chapter~\ref{chap:versor} that each layer transition has
+a bivector generator $\bivec{l}$.  If adjacent bivectors commute
+($[\bivec{l}, \bivec{l+1}] = 0$), the network could equivalently apply
+both rotations in a single step.  Non-zero commutators mean the
+\emph{order of layers matters} --- the network is doing genuinely
+sequential computation that cannot be parallelised.
+
+\paragraph{The Jacobi identity as a consistency check.}
+For any three bivectors, the \textbf{Jacobi identity} holds:
+\[
+  [A, [B, C]] + [B, [C, A]] + [C, [A, B]] = 0
+\]
+This is not a trivial sum: each term may be large.  The identity says
+these non-commutativities are constrained --- they cannot be
+independent.  You can verify this numerically as a sanity check on
+your computations.  It also means that the \emph{third} BCH correction
+term above is not free --- it is determined by lower-order commutators.
+
 \section{Computing commutators}
 
 \begin{lstlisting}[caption={Commutator of two bivectors}]
@@ -1566,6 +1706,77 @@ tokens.  This means the model processes each token through a
 \emph{different} curved region of representation space --- a form of
 token-specific computation.
 \end{finding}
+
+\section{The nonseparability index}
+
+The holonomy map gives curvature at every plaquette.  To summarise the
+\emph{total} amount of non-trivial computation in a single number,
+sum it up:
+
+\begin{gabox}
+\textbf{Nonseparability index.}
+\[
+  \mathcal{D}(s) = \sum_{l=0}^{L-2}\sum_{t=0}^{T-2}
+    \|\Omega^{(l,t)}\|_F
+\]
+where $\Omega^{(l,t)} = R_{\mathrm{loop}}^{(l,t)} - I$ is the
+holonomy operator at plaquette $(l, t)$.
+\end{gabox}
+
+Think of $\mathcal{D}(s)$ as a ``total curvature budget.''  If
+$\mathcal{D}(s) = 0$, the hidden-state field is \emph{separable}: the
+layer transformations and token transformations are independent, and the
+model is doing a simple lookup.  If $\mathcal{D}(s) > 0$, the model is
+performing genuinely interactive computation --- the kind where \emph{which
+token you are} changes \emph{what the layer does}.
+
+The normalised version $\bar{\mathcal{D}}(s) = \mathcal{D}(s) /
+((L-1)(T-1))$ is the mean curvature per plaquette, which is comparable
+across prompts of different lengths.
+
+\begin{lstlisting}[caption={Computing the nonseparability index}]
+# From a holonomy map (L-1, T-1)
+holo_map = result.holonomy_map
+D_total = holo_map.sum()    # nonseparability index
+D_mean = holo_map.mean()    # mean curvature per plaquette
+print(f"Total nonseparability: {D_total:.2f}")
+print(f"Mean curvature/plaquette: {D_mean:.4f}")
+\end{lstlisting}
+
+\section{Curvature regimes}
+
+Different prompts produce different curvature landscapes.  It is useful
+to classify these into regimes, because each regime tells you something
+qualitatively different about what the model is doing:
+
+\begin{center}
+\renewcommand{\arraystretch}{1.3}\small
+\begin{tabular}{@{} l l l @{}}
+\toprule
+\textbf{Regime} & \textbf{Holonomy signature} & \textbf{Interpretation} \\
+\midrule
+\textbf{Flat} & $\|\Omega\| \approx 0$ everywhere
+  & Separable; simple lookup or memorisation \\
+\textbf{Low curvature} & $\|\Omega\|$ small, smooth
+  & Weakly interactive; straightforward recall \\
+\textbf{High curvature} & $\|\Omega\|$ large, structured
+  & Strongly interactive; multi-step reasoning \\
+\textbf{Chaotic} & $\mathrm{Var}(\|\Omega\|) \gg 0$
+  & Unstable; potential hallucination \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\begin{keyidea}
+The curvature regime is a \emph{geometric} signature of the model's
+computational strategy.  \textbf{Flat} means no interaction.
+\textbf{High curvature} means the model is working hard --- but whether
+that work is productive depends on whether the curvature is
+\emph{structured} (concentrated in a few plaquettes and planes) or
+\emph{chaotic} (scattered with high variance).
+Chapter~\ref{chap:applications} uses these regimes to distinguish
+factual reasoning from hallucination.
+\end{keyidea}
 
 \begin{tryit}
 \textbf{Notebook: Chapter 10.}
@@ -2121,6 +2332,74 @@ $\kappa_G$ with low $\mathcal{C}$ is a \emph{warning sign}: the
 apparent consistency may be a metric artefact rather than genuine
 agreement.
 \end{finding}
+
+\subsection{The Binet--Cauchy cosine: detecting causal inversions}
+
+Bivector coherence tells you whether reasoning \emph{paths} agree with
+each other.  But a model can also fail in a subtler way: the logical
+\emph{direction} of reasoning can be reversed --- a conclusion appears
+before its premise, or a cause follows its effect.  This is a
+\textbf{causal inversion}, and detecting it requires an oriented
+measure.
+
+The \textbf{Binet--Cauchy cosine} (BCcos) provides exactly this.
+Consider two pairs of unit vectors:
+\begin{itemize}[nosep]
+\item $(u_i, u_{i+1})$: consecutive reasoning-step embeddings
+  (the model's trajectory).
+\item $(c_q, c_{\text{ctx}})$: query and context direction
+  (the expected flow of information).
+\end{itemize}
+
+Form the $2 \times 2$ matrix of their inner products:
+\[
+  S = \begin{pmatrix}
+    u_i^\top c_q & u_i^\top c_{\text{ctx}} \\
+    u_{i+1}^\top c_q & u_{i+1}^\top c_{\text{ctx}}
+  \end{pmatrix}
+\]
+
+\begin{gabox}
+\textbf{Binet--Cauchy cosine.}
+\[
+  \text{BCcos}(u_i, u_{i+1}; c_q, c_{\text{ctx}})
+  = \frac{\det S}{\|u_i \op u_{i+1}\| \; \|c_q \op c_{\text{ctx}}\|
+    + \epsilon}
+\]
+The numerator $\det S$ is a \textbf{signed oriented area}: it equals
+the inner product between the bivectors $u_i \op u_{i+1}$ and
+$c_q \op c_{\text{ctx}}$.  The denominator normalises by the product
+of their areas.
+\end{gabox}
+
+\paragraph{Why this is a GA concept.}
+The determinant $\det S = (u_i^\top c_q)(u_{i+1}^\top c_{\text{ctx}})
+- (u_i^\top c_{\text{ctx}})(u_{i+1}^\top c_q)$ is precisely the
+contraction of two bivectors:
+$\langle u_i \op u_{i+1}, \, c_q \op c_{\text{ctx}} \rangle$.  In
+GA language, BCcos measures whether the \emph{plane of the model's
+reasoning trajectory} is aligned with the \emph{plane of the expected
+information flow}.
+
+\paragraph{Three regimes of BCcos.}
+\begin{itemize}[nosep]
+\item \textbf{BCcos $\approx +1$}: the reasoning trajectory is aligned
+  with the expected information flow (correct causal direction).
+\item \textbf{BCcos $\approx 0$}: the trajectory is orthogonal to
+  the expected flow (irrelevant computation).
+\item \textbf{BCcos $\ll 0$ (strongly negative)}: the trajectory is
+  \emph{reversed} --- a causal inversion.  The model's reasoning
+  flows opposite to the expected direction.
+\end{itemize}
+
+\begin{keyidea}
+Cosine similarity can tell you whether two vectors are aligned, but it
+cannot detect \emph{causal inversions} --- for that, you need an
+\textbf{oriented} measure that is sensitive to the \emph{order} of the
+vectors.  The determinant of $S$ provides this orientation through the
+wedge product.  This is information that no scalar similarity measure
+can capture.
+\end{keyidea}
 
 % ────────────────────────────────────────────────────────────────────
 \section{Application 3: Plane-specific steering}

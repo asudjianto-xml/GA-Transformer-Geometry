@@ -324,3 +324,50 @@ def commutator_plane_decomposition(bivectors: list[Bivector],
         "principal_planes": planes,
         "total_norm": total_norm,
     }
+
+
+# ── Nonseparability index ───────────────────────────────────────────
+
+def nonseparability_index(
+    H_tilde: np.ndarray, eps: float = 1e-8
+) -> dict:
+    """Compute the nonseparability index D(s) = sum of all holonomy norms.
+
+    This is a single scalar summarising the total amount of non-separable
+    (interactive) computation in the hidden-state field.
+
+    D(s) = 0 means layer and token operations are independent (separable).
+    D(s) > 0 means the model performs genuinely interactive computation.
+
+    Args:
+        H_tilde: (L, T, k) whitened hidden states.
+        eps: numerical stability.
+
+    Returns:
+        dict with:
+            D_total: total nonseparability (sum of holonomy norms).
+            D_mean: mean curvature per plaquette.
+            holo_map: (L-1, T-1) scalar curvature at each plaquette.
+            regime: str, one of 'flat', 'low', 'high', 'chaotic'.
+    """
+    hmap = holonomy_scalar_map(H_tilde, eps=eps)
+    D_total = float(hmap.sum())
+    D_mean = float(hmap.mean())
+
+    # Classify curvature regime
+    cv = float(np.std(hmap) / (D_mean + eps))  # coefficient of variation
+    if D_mean < 0.01:
+        regime = "flat"
+    elif D_mean < 0.5:
+        regime = "low"
+    elif cv < 1.5:
+        regime = "high"
+    else:
+        regime = "chaotic"
+
+    return {
+        "D_total": D_total,
+        "D_mean": D_mean,
+        "holo_map": hmap,
+        "regime": regime,
+    }

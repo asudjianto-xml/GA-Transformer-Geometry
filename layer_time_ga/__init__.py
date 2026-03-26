@@ -36,6 +36,11 @@ from .algebra import (
     rotor_inverse,
     commutator_bivector,
     grade_decomposition,
+    rodrigues_rotation,
+    rodrigues_rotor,
+    cayley_bivector,
+    binet_cauchy_cosine,
+    directional_flow_ratio,
 )
 
 from .decomposition import (
@@ -54,6 +59,7 @@ from .curvature import (
     holonomy_bivector,
     commutator_field,
     commutator_plane_decomposition,
+    nonseparability_index,
 )
 
 from .capacity import (
@@ -88,7 +94,14 @@ __all__ = [
     "holonomy_bivector",
     "commutator_field",
     "commutator_plane_decomposition",
+    "nonseparability_index",
     # Capacity
     "GACapacityProfile",
     "ga_capacity_profile",
+    # Additional GA tools
+    "rodrigues_rotation",
+    "rodrigues_rotor",
+    "cayley_bivector",
+    "binet_cauchy_cosine",
+    "directional_flow_ratio",
 ]

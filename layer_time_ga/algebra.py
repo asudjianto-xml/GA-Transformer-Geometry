@@ -364,3 +364,138 @@ def geometric_product_vectors(a: np.ndarray, b: np.ndarray) -> dict:
         "scalar": scalar,
         "bivector": bivector_from_skew(wedge),
     }
+
+
+# ── Rodrigues rotation ──────────────────────────────────────────────
+
+def rodrigues_rotation(u: np.ndarray, v: np.ndarray) -> np.ndarray:
+    """Rodrigues rotation matrix that maps unit vector u to unit vector v.
+
+    Uses the exact closed-form Rodrigues formula:
+        R = I + sin(theta) * B_hat + (1 - cos(theta)) * B_hat^2
+    where B_hat is the unit bivector (skew-symmetric) in the u^v plane.
+
+    Exact for any angle, including large rotations (>60 degrees).
+
+    Args:
+        u: (k,) unit vector (source).
+        v: (k,) unit vector (target).
+
+    Returns:
+        (k, k) rotation matrix R such that R @ u = v.
+    """
+    k = len(u)
+    cos_theta = float(np.clip(np.dot(u, v), -1.0, 1.0))
+    if cos_theta > 1.0 - 1e-12:
+        return np.eye(k)
+    sin_theta = np.sqrt(1.0 - cos_theta ** 2)
+    # Skew-symmetric matrix in the u^v plane
+    B = np.outer(v, u) - np.outer(u, v)
+    if sin_theta < 1e-12:
+        # 180-degree rotation: B is zero, use fallback
+        return 2.0 * np.outer(v, v) - np.eye(k)
+    B_hat = B / sin_theta  # unit bivector
+    R = np.eye(k) + sin_theta * B_hat + (1.0 - cos_theta) * (B_hat @ B_hat)
+    return R
+
+
+def rodrigues_rotor(u: np.ndarray, v: np.ndarray) -> Rotor:
+    """Rotor that maps unit vector u to unit vector v via Rodrigues formula.
+
+    Args:
+        u: (k,) unit vector (source).
+        v: (k,) unit vector (target).
+
+    Returns:
+        Rotor with associated bivector generator.
+    """
+    R = rodrigues_rotation(u, v)
+    return rotor_from_orthogonal(R, compute_bivector=True)
+
+
+# ── Cayley bivector ─────────────────────────────────────────────────
+
+def cayley_bivector(u: np.ndarray, v: np.ndarray) -> tuple[Bivector, float]:
+    """Cayley bivector encoding the rotation from u to v.
+
+    A(u, v) = (v u^T - u v^T) / (1 + v^T u)
+
+    The steering magnitude is tau = ||A||_F / sqrt(2) = tan(theta/2)
+    where theta = arccos(u^T v).  The sqrt(2) arises because the
+    Frobenius norm of a rank-2 skew-symmetric matrix has a factor of
+    sqrt(2) relative to the rotation-angle parameterisation.
+
+    Args:
+        u: (k,) unit vector (prior / source).
+        v: (k,) unit vector (posterior / target).
+
+    Returns:
+        (Bivector, tau): the bivector and its steering magnitude.
+    """
+    denom = 1.0 + np.dot(v, u)
+    if denom < 1e-12:
+        raise ValueError("Vectors are antiparallel; Cayley map is undefined.")
+    A = (np.outer(v, u) - np.outer(u, v)) / denom
+    biv = bivector_from_skew(A)
+    tau = biv.norm / np.sqrt(2.0)  # tan(theta/2)
+    return biv, tau
+
+
+# ── Binet-Cauchy cosine ────────────────────────────────────────────
+
+def binet_cauchy_cosine(
+    u_i: np.ndarray,
+    u_next: np.ndarray,
+    c_q: np.ndarray,
+    c_ctx: np.ndarray,
+    eps: float = 1e-12,
+) -> float:
+    """Binet-Cauchy cosine: signed bivector alignment between two planes.
+
+    Measures whether the reasoning trajectory (u_i -> u_next) flows in
+    the same oriented direction as the expected information flow
+    (c_q -> c_ctx).
+
+    BCcos = det(S) / (||u_i ^ u_next|| * ||c_q ^ c_ctx|| + eps)
+
+    where S is the 2x2 matrix of inner products:
+        S = [[u_i . c_q,   u_i . c_ctx],
+             [u_next . c_q, u_next . c_ctx]]
+
+    Returns:
+        float in [-1, 1].  +1 = aligned, -1 = causal inversion.
+    """
+    S = np.array([
+        [np.dot(u_i, c_q), np.dot(u_i, c_ctx)],
+        [np.dot(u_next, c_q), np.dot(u_next, c_ctx)],
+    ])
+    det_S = S[0, 0] * S[1, 1] - S[0, 1] * S[1, 0]
+
+    # Norms of wedge products (= sin of angle between each pair)
+    norm_u = np.sqrt(max(0.0, 1.0 - np.dot(u_i, u_next) ** 2))
+    norm_c = np.sqrt(max(0.0, 1.0 - np.dot(c_q, c_ctx) ** 2))
+
+    return float(det_S / (norm_u * norm_c + eps))
+
+
+# ── Directional flow ratio ─────────────────────────────────────────
+
+def directional_flow_ratio(M: np.ndarray, eps: float = 1e-12) -> float:
+    """Grade-2 to grade-0 ratio of a matrix (directional flow ratio).
+
+    R = ||A||_F / (||S||_F + eps)
+
+    where S = (M + M^T)/2 (symmetric / grade-0) and
+          A = (M - M^T)/2 (antisymmetric / grade-2 / bivector).
+
+    R >> 1: rotation-dominated.  R << 1: metric-dominated.
+
+    Args:
+        M: (k, k) matrix (e.g. layer transition operator).
+
+    Returns:
+        float, the directional flow ratio.
+    """
+    S = 0.5 * (M + M.T)
+    A = 0.5 * (M - M.T)
+    return float(np.linalg.norm(A, "fro") / (np.linalg.norm(S, "fro") + eps))
