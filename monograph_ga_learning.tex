@@ -1372,6 +1372,19 @@ into three computational phases:
 The transition between phases is not arbitrary --- it reflects a shift
 in which \emph{grade} of the geometric product dominates the dynamics.
 
+\textbf{What drives this structure?}  The answer lies at the output.
+The model predicts by computing $\mathrm{logit}_w = W_{\mathrm{head}}[w] \cdot H^{(L-1)}$:
+the logit for word $w$ is the dot product of the final hidden state with
+the $w$-th row of the unembedding matrix (Appendix~\ref{app:transformers}).
+For the correct prediction to win, $H^{(L-1)}$ must \emph{point in the
+right direction}.  This directional requirement propagates backward
+through the network: early layers must rotate the embedding into an
+orientation from which middle layers can perform contextual computation,
+and late layers must funnel the result toward the target vocabulary
+vector.  The rotation activity we observe is not incidental --- it is the
+geometric mechanism by which the model steers its representation toward
+the correct prediction.
+
 \section{The directional flow ratio}
 
 To quantify the grade balance at each layer, we define:
@@ -1593,10 +1606,18 @@ with eigenvalues $\sigma_1 \geq \sigma_2 \geq \cdots \geq \sigma_k > 0$.
 Rotation (grade-2) preserves norms by definition: $\|Rv\| = \|v\|$.
 Stretching (grade-0) changes norms: $\|Pv\| \neq \|v\|$ in general.
 
-During backpropagation, gradient magnitudes are controlled by the
-eigenvalues of $P$, not by the rotation.  This is why modifying
-eigenvalues (grade-0) has a 48\% effect on dependency while modifying
-the rotor (grade-2) has only a 9\% effect.
+The model predicts by computing $\mathrm{logit}_w = W_{\mathrm{head}}[w]
+\cdot H^{(L-1)}$: a dot product between the final hidden state and each
+vocabulary vector.  For the correct prediction to win, $H^{(L-1)}$ must
+have a large component along the target direction.  Rotation can point the
+vector toward the right direction, but only stretching can
+\emph{amplify} that direction relative to competitors.  This is why
+grade-0 controls the output: modifying eigenvalues (grade-0) has a 48\%
+effect on dependency while modifying the rotor (grade-2) has only a
+9\% effect.
+
+Both grades are essential, but they serve different roles: rotation
+\emph{steers}, stretching \emph{selects}.
 \end{keyidea}
 
 \begin{mathbox}
@@ -1634,9 +1655,13 @@ plt.tight_layout()
 \textbf{Late layers are highly selective} (observed in Qwen2.5-7B).
 The eigenvalue spectrum becomes increasingly peaked toward the output: a
 handful of directions carry most of the signal, while the rest are
-suppressed.  This is consistent with the metric factor implementing the
-model's ``decision'' about which information to propagate to the final
-prediction.
+suppressed.  This is the metric factor implementing the model's ``decision'' about
+which information to propagate to the final prediction.  The reason is
+architectural: the logit for word $w$ is the dot product
+$W_{\mathrm{head}}[w] \cdot H^{(L-1)}$, so the final hidden state
+must point toward the correct vocabulary vector.  The peaked spectrum
+in late layers is the grade-0 mechanism that achieves this alignment
+--- amplifying the target direction while suppressing competitors.
 \end{finding}
 
 \begin{tryit}
@@ -3175,14 +3200,29 @@ The highest-probability token is selected as the prediction.
 
 Geometrically, the logit for word $w$ is the dot product of
 $H^{(L-1,t)}$ with the $w$-th row of $W_{\mathrm{head}}$.  This means
-the final hidden state must point in the ``right direction'' for the
-correct prediction to win.  In Chapter~8, we observe that the last few
-layers have highly peaked eigenvalue spectra (condition numbers
-$> 10^3$, effective rank $< 10$): the metric factor $P^{(l)}$
-aggressively amplifies a small number of directions and suppresses the
-rest.  This is the grade-0 mechanism for ``choosing'' a prediction ---
-funnelling the hidden state toward the direction of the correct
-vocabulary vector.
+the final hidden state must \emph{point in the right direction} for the
+correct prediction to win.  This directional requirement is the
+ultimate driver of the rotation activity we observe throughout the
+network:
+
+\begin{itemize}[nosep]
+\item \textbf{Early layers} perform large rotations (Chapter~6: up to
+  $245^\circ$) to re-encode the raw embedding into an orientation from
+  which deeper layers can work.
+\item \textbf{Middle layers} perform context-dependent rotations --- the
+  planes shift depending on what the model has read (Chapter~7).  This
+  is where meaning is built: the hidden state is steered toward the
+  correct region of representation space.
+\item \textbf{Late layers} shift from rotation to stretching
+  (Chapter~8): condition numbers exceed $10^3$ and effective ranks drop
+  below~10.  The metric factor $P^{(l)}$ aggressively amplifies the
+  target direction and suppresses competitors, funnelling the hidden
+  state toward the correct vocabulary vector.
+\end{itemize}
+
+In the language of this book: rotation \emph{steers} (grade-2),
+stretching \emph{selects} (grade-0).  Both are driven by the
+dot-product geometry of the unembedding layer.
 
 \subsection*{Autoregressive generation}
 
