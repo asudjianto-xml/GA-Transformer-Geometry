@@ -2995,6 +2995,32 @@ $t$ indexes the token position; $p$ is the \textbf{hidden dimension}
 (e.g., $p = 3584$ for Qwen2.5-7B).  These initial vectors are the
 starting point for all subsequent computation.
 
+\section{The embedding layer (layer 0)}
+
+The embedding table is a matrix $W_E \in \mathbb{R}^{p \times V}$
+where $V$ is the vocabulary size.  Each token $x_t$ (an integer index
+into the vocabulary) is mapped to a column of this matrix:
+\[
+  H^{(0,t)} = W_E[\,x_t\,] + \mathrm{pos}(t)
+\]
+where $\mathrm{pos}(t)$ is a \textbf{positional encoding} that tells
+the model where in the sequence this token appears.  (Modern models
+like Qwen use \emph{Rotary Position Embeddings} (RoPE), which inject
+position information inside the attention mechanism rather than by
+adding a vector here; the effect is similar.)
+
+The key point for this book: \textbf{the embedding vectors
+$H^{(0,t)}$ are not random.}  Tokens with related meanings have
+similar embeddings (``cat'' and ``kitten'' are close, ``cat'' and
+``democracy'' are far apart).  However, the embedding space is
+organised very differently from the model's internal processing
+space.  The transition from layer~0 to layer~1 is therefore
+exceptionally large --- in Chapter~6, we observe a rotation of
+$4.28$ radians ($245^\circ$) at this boundary, far larger than any
+subsequent layer transition.  The first few layers are essentially
+\emph{re-encoding} the token-identity information into a coordinate
+system suited for deeper processing.
+
 \section{The decoder-only architecture}
 
 A GPT-style transformer consists of $L$ identical \textbf{decoder
@@ -3126,25 +3152,48 @@ This is why the causal mask exists in self-attention --- token $t$ must
 not see tokens $t+1, t+2, \ldots$ because they have not been generated
 yet.
 
-Concretely, the final hidden state $H^{(L-1, t)}$ at the last token
-position is projected to a score for every word in the vocabulary via
-a learned linear map $W_{\mathrm{head}} \in \mathbb{R}^{V \times p}$:
+\subsection*{The unembedding layer (decoding)}
+
+After the final transformer layer, the hidden state must be converted
+back into a prediction over words.  This is done by the
+\textbf{unembedding layer} (also called the \textbf{language model
+head}), a learned linear map
+$W_{\mathrm{head}} \in \mathbb{R}^{V \times p}$:
 \[
   \mathrm{logits} = W_{\mathrm{head}} \, H^{(L-1, t)}
 \]
 where $V$ is the vocabulary size (e.g., $V = 151{,}936$ for
-Qwen2.5-7B).  These scores are called \textbf{logits}; higher values
-mean higher probability.  Applying a softmax converts logits to a
-probability distribution over the vocabulary, and the
-highest-probability token is selected as the prediction.
+Qwen2.5-7B).  Each entry of the resulting $V$-dimensional vector is
+the \textbf{logit} (unnormalised score) for one vocabulary token.
+Applying a softmax converts logits to probabilities:
+\[
+  P(x_{t+1} = w \mid x_{\le t})
+    = \frac{\exp(\mathrm{logit}_w)}
+           {\sum_{w'=1}^{V} \exp(\mathrm{logit}_{w'})}
+\]
+The highest-probability token is selected as the prediction.
+
+Geometrically, the logit for word $w$ is the dot product of
+$H^{(L-1,t)}$ with the $w$-th row of $W_{\mathrm{head}}$.  This means
+the final hidden state must point in the ``right direction'' for the
+correct prediction to win.  In Chapter~8, we observe that the last few
+layers have highly peaked eigenvalue spectra (condition numbers
+$> 10^3$, effective rank $< 10$): the metric factor $P^{(l)}$
+aggressively amplifies a small number of directions and suppresses the
+rest.  This is the grade-0 mechanism for ``choosing'' a prediction ---
+funnelling the hidden state toward the direction of the correct
+vocabulary vector.
+
+\subsection*{Autoregressive generation}
 
 The \textbf{score} $s(x, u)$ of a token $u$ at the end of text $x$ is
 the logit assigned to $u$ --- this is what the dependency gradient
 (Chapter~\ref{chap:dependency}) differentiates through.
 
-To generate a full sentence, this process repeats: the predicted token
+To generate a full sentence, the process repeats: the predicted token
 is appended to the input, and the model runs again to predict the next
-token, one step at a time.
+token, one step at a time.  At each step, the causal mask ensures the
+model sees only the tokens generated so far.
 
 \section{What gradients measure}
 
