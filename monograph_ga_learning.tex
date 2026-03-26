@@ -2969,6 +2969,14 @@ the full bivector.
 This appendix provides the transformer background needed for the book.
 No prior ML knowledge is assumed; we build from first principles.
 
+Every model we study in this book --- Qwen2.5-7B, Qwen2.5-32B,
+DeepSeek-R1-Distill-Qwen-7B --- is a \textbf{GPT-style}
+(decoder-only, autoregressive) transformer.  This is the architecture
+behind GPT-4, Claude, LLaMA, and most modern large language models.
+We describe this specific architecture below; encoder-only models
+(like BERT) and encoder-decoder models (like the original Transformer
+of Vaswani et~al., 2017) share many ideas but differ in structure.
+
 \section{What is a language model?}
 
 A language model is a function that, given a sequence of words (tokens),
@@ -2987,12 +2995,13 @@ $t$ indexes the token position; $p$ is the \textbf{hidden dimension}
 (e.g., $p = 3584$ for Qwen2.5-7B).  These initial vectors are the
 starting point for all subsequent computation.
 
-\section{The architecture}
+\section{The decoder-only architecture}
 
-A transformer consists of $L$ identical layers stacked sequentially.
+A GPT-style transformer consists of $L$ identical \textbf{decoder
+layers} stacked sequentially (there is no separate encoder).
 Each layer transforms the hidden state $H^{(l,t)} \to H^{(l+1,t)}$
-through two sub-components applied in sequence: self-attention and a
-feed-forward network.
+through two sub-components applied in sequence: \emph{causal}
+self-attention and a feed-forward network.
 
 \subsection*{Self-attention}
 
@@ -3107,13 +3116,35 @@ token axis corresponds to the model's processing breadth.
 
 \section{Autoregressive prediction}
 
-GPT-style models predict the next token given all preceding tokens:
-$P(x_t \mid x_{<t})$.  The final hidden state $H^{(L-1, t)}$ is
-projected to a score for every word in the vocabulary (called \textbf{logits}) via a learned linear map. Higher logits mean higher probability. The
-highest-probability token is selected.  The \textbf{score}
-$s(x, u)$ of a token $u$ at the end of text $x$ is the logit
-assigned to $u$ --- this is what the dependency gradient
+The defining feature of a decoder-only model is \textbf{autoregressive
+generation}: it predicts one token at a time, always conditioning on
+everything that came before:
+\[
+  P(x_t \mid x_1, x_2, \ldots, x_{t-1})
+\]
+This is why the causal mask exists in self-attention --- token $t$ must
+not see tokens $t+1, t+2, \ldots$ because they have not been generated
+yet.
+
+Concretely, the final hidden state $H^{(L-1, t)}$ at the last token
+position is projected to a score for every word in the vocabulary via
+a learned linear map $W_{\mathrm{head}} \in \mathbb{R}^{V \times p}$:
+\[
+  \mathrm{logits} = W_{\mathrm{head}} \, H^{(L-1, t)}
+\]
+where $V$ is the vocabulary size (e.g., $V = 151{,}936$ for
+Qwen2.5-7B).  These scores are called \textbf{logits}; higher values
+mean higher probability.  Applying a softmax converts logits to a
+probability distribution over the vocabulary, and the
+highest-probability token is selected as the prediction.
+
+The \textbf{score} $s(x, u)$ of a token $u$ at the end of text $x$ is
+the logit assigned to $u$ --- this is what the dependency gradient
 (Chapter~\ref{chap:dependency}) differentiates through.
+
+To generate a full sentence, this process repeats: the predicted token
+is appended to the input, and the model runs again to predict the next
+token, one step at a time.
 
 \section{What gradients measure}
 
