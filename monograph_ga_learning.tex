@@ -244,6 +244,32 @@ Each chapter follows the same pattern:
 The chapters build sequentially: each depends on the previous.  Read them
 in order the first time.  After that, use the chapters as reference.
 
+\subsection*{Three kinds of statement}
+
+This book mixes mathematics, computation, and empirical observation.  To
+keep the distinction clear, we use three categories throughout:
+
+\begin{itemize}[nosep]
+\item \textbf{GA identity} (exact).  A mathematical fact that holds in any
+  Clifford algebra $\mathrm{Cl}(k, 0)$.  Example: the geometric product
+  decomposes as $ab = a \ip b + a \op b$.  These do not depend on any
+  model or dataset.
+\item \textbf{Computational construction} (defined).  A procedure we
+  define and apply to transformer data: whitening, the layer transition
+  operator, versor decomposition, dependency density, etc.  These are
+  methodological choices, not theorems.
+\item \textbf{Empirical observation} (observed).  A pattern we find in
+  a specific model under a specific setup --- for instance, that grade-0
+  dominates grade-2 in late layers of Qwen2.5-7B.  These observations
+  motivate the narrative, but they are not guaranteed to hold for all
+  models, prompts, or whitening dimensions.
+\end{itemize}
+
+We mark empirical observations with phrases like ``in Qwen2.5-7B'' or
+``in our experiments'' to distinguish them from exact GA identities.
+When a \emph{Finding} box reports a pattern, it is an empirical
+observation unless stated otherwise.
+
 \subsection*{The companion notebooks}
 
 Each chapter has a companion Jupyter notebook in
@@ -277,6 +303,66 @@ result.summary()
 \mainmatter
 % ══════════════════════════════════════════════════════════════════════════════
 
+
+\chapter*{The Pipeline at a Glance}
+\addcontentsline{toc}{chapter}{The Pipeline at a Glance}
+
+Before diving into the algebra, here is a one-page map of how raw
+transformer data becomes geometric objects.  You do not need to
+understand every step now --- each is developed in the corresponding
+chapter.  Refer back to this page whenever you need orientation.
+
+\begin{enumerate}
+\item \textbf{Hidden states} $H^{(l,t)} \in \mathbb{R}^p$
+  (Chapter~\ref{chap:vectors}).  \\
+  A transformer with $L$ layers and $T$ input tokens produces a
+  $(L \times T)$ grid of hidden-state vectors, each in the model's
+  native dimension $p$ (e.g., $p = 3584$ for Qwen2.5-7B).
+
+\item \textbf{Whitening} $\widetilde{H}^{(l,t)} \in \mathbb{R}^k$
+  (Chapter~\ref{chap:whitening}).  \\
+  PCA-based whitening projects from $\mathbb{R}^p$ to $\mathbb{R}^k$
+  (typically $k = 256$, retaining $>99\%$ of variance) and ensures
+  the covariance is the identity matrix $I_k$.
+  This establishes the orthonormal frame required for $\mathrm{Cl}(k, 0)$.
+
+\item \textbf{Layer transition operator} $T^{(l)} \in \mathbb{R}^{r \times r}$
+  (Chapter~\ref{chap:versor}).  \\
+  The least-squares map from whitened states at layer~$l$ to layer~$l+1$,
+  restricted to the joint token subspace (rank $r \le 2T$).
+
+\item \textbf{Versor decomposition} $T^{(l)} = \rotor{l}\,\metric{l}$
+  (Chapter~\ref{chap:versor}).  \\
+  Polar decomposition splits each transition into a rotor
+  $\rotor{l} \in \mathrm{SO}(r)$ (\emph{grade-2}: rotation) and a
+  symmetric factor $\metric{l}$ (\emph{grade-0}: stretching).
+
+\item \textbf{Bivector field} $\{\bivec{l}\}$
+  (Chapter~\ref{chap:planes}).  \\
+  The skew-symmetric generator $\bivec{l} = \log(\rotor{l})$ is a
+  bivector encoding the rotation planes and angles at each layer.
+
+\item \textbf{Holonomy} $\Omega^{(l,t)}$
+  (Chapter~\ref{chap:holonomy}).  \\
+  Compose rotors around a plaquette $(l, t)$ on the grid.  If the
+  result is not the identity, the grid is curved at that point.
+  The holonomy bivector gives the direction of curvature.
+
+\item \textbf{Dependency density} $D_l$
+  (Chapter~\ref{chap:dependency}).  \\
+  The gradient $\|\partial s / \partial \widetilde{H}^{(l)}\|$
+  measures how much the model's output score depends on each layer.
+  This is a \emph{computational construction}, not a GA identity.
+\end{enumerate}
+
+\vspace{0.5em}
+\noindent
+\textbf{The key insight}: steps 1--3 are standard linear algebra.
+Steps 4--6 are where GA enters: the same matrices acquire
+\emph{geometric meaning} --- planes of rotation, angles, curvature
+direction --- that is invisible in the matrix representation alone.
+
+\clearpage
 
 % ╔════════════════════════════════════════════════════════════════════════════╗
 \part{Vectors and Products}
@@ -851,6 +937,7 @@ variance.  This is a lossy projection, but the lost dimensions carry
 negligible information.
 
 \begin{finding}
+\textbf{Empirical observation (Qwen2.5-7B).}
 The geometric structure (rotor angles, curvature patterns) stabilizes by
 $k \approx 128$.  Using $k = 256$ provides comfortable headroom.
 The coarse features (which layers have high rotation) are visible even
@@ -1112,24 +1199,25 @@ for i, vd in enumerate(rf.decompositions):
 The rotor field has three main signatures:
 
 \begin{finding}
-\textbf{1. Rotation angle profile.}  The angle $\theta^{(l)}$ measures
-how much the hidden states rotate at each layer.  Typically: moderate
-rotation in early layers, a dip in the middle, and a peak in the final
-layers as the model converges to a prediction.
+\textbf{1. Rotation angle profile} (observed in Qwen2.5-7B).
+The angle $\theta^{(l)}$ measures how much the hidden states rotate at
+each layer.  In our experiments: moderate rotation in early layers, a
+dip in the middle, and a peak in the final layers as the model
+converges to a prediction.
 \end{finding}
 
 \begin{finding}
-\textbf{2. Condition number profile.}  The condition number $\kappa^{(l)}$
-of the metric factor $\metric{l}$ measures how selective the layer is.
-Late layers have $\kappa \gg 1$: they strongly amplify a few directions
-and suppress the rest.
+\textbf{2. Condition number profile} (observed in Qwen2.5-7B).
+The condition number $\kappa^{(l)}$ of the metric factor $\metric{l}$
+measures how selective the layer is.  In late layers, $\kappa \gg 1$:
+the layer strongly amplifies a few directions and suppresses the rest.
 \end{finding}
 
 \begin{finding}
-\textbf{3. Effective rank profile.}  The effective rank
-$\mathrm{erank}^{(l)}$ measures how many directions are actively used.
-It decreases from early to late layers: the representation concentrates
-into a lower-dimensional subspace.
+\textbf{3. Effective rank profile} (observed in Qwen2.5-7B).
+The effective rank $\mathrm{erank}^{(l)}$ measures how many directions
+are actively used.  It tends to decrease from early to late layers: the
+representation concentrates into a lower-dimensional subspace.
 \end{finding}
 
 \section{The three-phase structure}
@@ -1198,19 +1286,20 @@ For each layer, compare:
 \end{align}
 
 \begin{finding}
-\textbf{Grade-0 dominates grade-2 in late layers.}  The metric
-deformation (stretching) is 5--10$\times$ larger than the rotation
-in the final layers.  This means late layers primarily
-\emph{select directions} (amplify/compress) rather than
-\emph{reorient} (rotate).
+\textbf{Grade-0 dominates grade-2 in late layers} (observed in
+Qwen2.5-7B).  The metric deformation (stretching) is
+5--10$\times$ larger than the rotation in the final layers.  This
+suggests that late layers primarily \emph{select directions}
+(amplify/compress) rather than \emph{reorient} (rotate).
 \end{finding}
 
 \begin{transformer}
-This has a profound implication for controlling model behavior.
-Modifying eigenvalues of $\metric{l}$ (grade-0 intervention) changes
-$D_{\text{total}}$ by $\sim$48\%.  Modifying the rotor (grade-2
-intervention) changes it by only $\sim$9\%.  The model's output is
-controlled by \emph{what it amplifies}, not \emph{where it points}.
+In Qwen2.5-7B, this has a striking implication for controlling model
+behavior.  Modifying eigenvalues of $\metric{l}$ (grade-0 intervention)
+changes $D_{\text{total}}$ by $\sim$48\%.  Modifying the rotor (grade-2
+intervention) changes it by only $\sim$9\%.  In this model, the output
+is controlled by \emph{what it amplifies}, not \emph{where it points}.
+Whether this generalises to other architectures is an open question.
 \end{transformer}
 
 \begin{tryit}
@@ -1412,11 +1501,12 @@ plt.tight_layout()
 \end{lstlisting}
 
 \begin{finding}
-\textbf{Late layers are highly selective.}  The eigenvalue spectrum
-becomes increasingly peaked toward the output: a handful of directions
-carry most of the signal, while the rest are suppressed.  This
-is the metric factor implementing the model's ``decision'' about which
-information to propagate to the final prediction.
+\textbf{Late layers are highly selective} (observed in Qwen2.5-7B).
+The eigenvalue spectrum becomes increasingly peaked toward the output: a
+handful of directions carry most of the signal, while the rest are
+suppressed.  This is consistent with the metric factor implementing the
+model's ``decision'' about which information to propagate to the final
+prediction.
 \end{finding}
 
 \begin{tryit}
@@ -1580,10 +1670,12 @@ plt.title('Commutator Norm Heatmap')
 \end{lstlisting}
 
 \begin{finding}
-The commutator heatmap often shows \textbf{block structure}: groups of
-layers that strongly interact (high commutator norms between them) and
-groups that are nearly commutative (low norms).  This block structure
-varies with prompt type and model architecture.
+\textbf{Block structure in the commutator field} (observed in
+Qwen2.5-7B).
+The commutator heatmap shows block structure: groups of layers that
+strongly interact (high commutator norms between them) and groups that
+are nearly commutative (low norms).  This block structure varies with
+prompt type and may differ across model architectures.
 \end{finding}
 
 \begin{tryit}
@@ -1693,18 +1785,19 @@ print(f"Shape: {holo_map.shape}")  # (L-1, T-1)
 \section{Curvature patterns in transformers}
 
 \begin{finding}
-\textbf{Curvature concentrates in the final layers.}  The last 3--5
-layers contain 60--80\% of the total curvature.  This is where the
-model's computation is most non-trivial: the layer and token axes
-interact strongly as the model converges to a prediction.
+\textbf{Curvature concentrates in the final layers} (observed in
+Qwen2.5-7B).  The last 3--5 layers contain 60--80\% of the total
+curvature.  This suggests that the model's most non-trivial computation
+--- where layer and token axes interact strongly --- occurs as it
+converges to a prediction.
 \end{finding}
 
 \begin{finding}
-\textbf{Curvature planes vary across tokens.}  At a fixed layer, the
-holonomy bivector can point in different directions for different
-tokens.  This means the model processes each token through a
-\emph{different} curved region of representation space --- a form of
-token-specific computation.
+\textbf{Curvature planes vary across tokens} (observed in Qwen2.5-7B).
+At a fixed layer, the holonomy bivector can point in different
+directions for different tokens.  This is consistent with the model
+processing each token through a \emph{different} curved region of
+representation space --- a form of token-specific computation.
 \end{finding}
 
 \section{The nonseparability index}
@@ -1868,11 +1961,12 @@ decomposition.
 \end{gabox}
 
 \begin{finding}
-\textbf{Distilled models concentrate capacity in fewer planes.}  The
-DeepSeek-R1-Distill model focuses its non-commutativity in fewer
-principal planes than the base Qwen model of the same size.
-Distillation appears to ``clean up'' the rotation structure by removing
-non-commutativity in planes that do not contribute to performance.
+\textbf{Distilled models concentrate capacity in fewer planes}
+(observed in DeepSeek-R1-Distill-Qwen-7B vs.\ Qwen2.5-7B).
+The distilled model focuses its non-commutativity in fewer principal
+planes than the base model of the same size.  This is consistent with
+distillation ``cleaning up'' the rotation structure, though whether this
+generalises beyond this model pair is an open question.
 \end{finding}
 
 \begin{tryit}
@@ -1945,7 +2039,8 @@ work} at layer $l$.  It combines ``how much the model cares'' with
 ``how much the layer rotates.''
 
 \begin{finding}
-\textbf{Peak effective work does not coincide with peak rotation.}
+\textbf{Peak effective work does not coincide with peak rotation}
+(observed in Qwen2.5-7B).
 The most geometrically active layer (highest $\theta$) is often
 \emph{not} the most important layer (highest $D_l$).  Effective work
 identifies the layers that are both active and important.
@@ -1975,9 +2070,10 @@ for l in top_layers:
 \end{lstlisting}
 
 \begin{transformer}
-This is the ultimate diagnostic: a list of specific layers and specific
-planes that drive the model's output.  If you want to steer the model's
-behavior, intervene at these layers, in these planes.  If you want to
+Effective work gives a ranked list of specific layers and specific
+planes that drive the model's output for a given prompt.  If you want
+to steer the model's behavior, these are the candidate intervention
+points.  If you want to
 understand a failure, look at what these planes are doing.
 \end{transformer}
 
@@ -2199,8 +2295,9 @@ representation.
 
 \begin{finding}
 \textbf{Curvature plane shift is a stronger indicator than magnitude
-change.}  Scalar curvature magnitude may change by only 10--20\%, but
-the \emph{direction} of curvature can shift substantially, indicating
+change} (observed in this example).  Scalar curvature magnitude may
+change by only 10--20\%, but the \emph{direction} of curvature can
+shift substantially, indicating
 qualitatively different computation.  This is information that scalar
 summaries cannot provide --- only the bivector direction reveals it.
 \end{finding}
@@ -2257,19 +2354,25 @@ the bivector, distinguishes these two cases.
 
 \subsection{Hallucination signatures in the GA profile}
 
-Hallucinations are associated with ``busy but useless'' layers: high
-geometric activity (curvature, rotation) but low dependency.  GA
-provides plane-level diagnostics:
+We hypothesise that hallucinations are associated with ``busy but
+useless'' layers: high geometric activity (curvature, rotation) but low
+dependency.  If this hypothesis holds, GA provides plane-level
+diagnostics that scalar summaries cannot:
 
 \begin{itemize}[nosep]
-\item \textbf{Consistent curvature plane}: the model is ``confidently
-  wrong'' --- it performs systematic but misdirected computation.
-  The holonomy bivector at high-activity layers points in a consistent
-  direction across tokens.
-\item \textbf{Random curvature planes}: the model is ``lost'' ---
+\item \textbf{Consistent curvature plane}: the model may be
+  ``confidently wrong'' --- performing systematic but misdirected
+  computation.  The holonomy bivector at high-activity layers would
+  point in a consistent direction across tokens.
+\item \textbf{Random curvature planes}: the model may be ``lost'' ---
   curvature directions vary across tokens without coherent structure.
-  The holonomy bivectors have low pairwise similarity.
+  The holonomy bivectors would have low pairwise similarity.
 \end{itemize}
+
+The following experiment tests this hypothesis on a single model
+and pair of prompts.  Broader validation across models, prompt types,
+and evaluation benchmarks is needed to establish these as reliable
+diagnostics.
 
 \subsection{Experiment: factual vs.\ confabulation prompt}
 
@@ -2323,14 +2426,15 @@ $2.36$ vs $2.04$), indicating the model never settles on a coherent
 geometric path.
 
 \begin{finding}
-\textbf{Metric anisotropy complements rotational diagnostics.}
+\textbf{Metric anisotropy complements rotational diagnostics}
+(observed in this example).
 The condition number $\kappa_G$ of the Gram matrix
-$G_{ij} = v_i^\top v_j$ measures spectral concentration.  When the
-model succeeds, reasoning paths are spectrally concentrated (low
-effective rank); when it fails, paths scatter more diffusely.  High
-$\kappa_G$ with low $\mathcal{C}$ is a \emph{warning sign}: the
-apparent consistency may be a metric artefact rather than genuine
-agreement.
+$G_{ij} = v_i^\top v_j$ measures spectral concentration.  In
+Qwen2.5-7B, factual prompts produce more spectrally concentrated
+paths (low effective rank) than confabulations.  High $\kappa_G$ with
+low $\mathcal{C}$ would be a \emph{warning sign}: apparent consistency
+that may be a metric artefact rather than genuine agreement.  Whether
+these patterns generalise requires further investigation.
 \end{finding}
 
 \subsection{The Binet--Cauchy cosine: detecting causal inversions}
@@ -2575,16 +2679,19 @@ Plane-specific & Modify $\metric{l}$ in 2D &
 \end{center}
 
 \begin{finding}
-\textbf{Rotation is the mechanism of semantic steering.}
-Across empirical studies, the central finding is that context
-influence in language models is a rotational phenomenon.  The Cayley
-bivector provides a unified representation: its magnitude detects
-vibing, its direction diagnoses the semantic category of context
-influence, and its associated rotation enables active intervention.
-Ablation studies show that random rotations catastrophically fail
-(0\% context-following), while learned rotations succeed (83\%),
-and scaling alone has no effect --- confirming that the antisymmetric
-(bivector) component carries the semantically meaningful signal.
+\textbf{Rotation as a mechanism of semantic steering} (interpretive
+hypothesis, supported by initial experiments).
+The examples in this chapter suggest that context influence in language
+models is a rotational phenomenon.  The Cayley bivector provides a
+unified representation: its magnitude detects vibing, its direction
+diagnoses the semantic category of context influence, and its
+associated rotation enables active intervention.  In prior ablation
+studies on Qwen2.5-7B, random rotations catastrophically fail (0\%
+context-following), while learned rotations succeed (83\%), and
+scaling alone has no effect --- consistent with the antisymmetric
+(bivector) component carrying the semantically meaningful signal.
+Establishing the generality of this finding across models and domains
+remains important future work.
 \end{finding}
 
 \begin{tryit}
@@ -2712,42 +2819,110 @@ the full bivector.
 \label{app:transformers}
 % ══════════════════════════════════════════════════════════════════════════════
 
-This appendix provides the minimum transformer background needed for the
-book.
+This appendix provides the transformer background needed for the book.
+No prior ML knowledge is assumed; we build from first principles.
+
+\section{What is a language model?}
+
+A language model is a function that, given a sequence of words (tokens),
+predicts the next word.  ``The capital of France is'' $\to$ ``Paris.''
+Internally, the model converts each token into a vector, transforms
+those vectors through many layers of computation, and reads out the
+prediction from the final layer.  The key objects for us are the
+\textbf{hidden states} --- the intermediate vectors at each layer.
+
+\section{Tokens and embeddings}
+
+Before processing, text is split into \textbf{tokens} (roughly
+word-pieces).  Each token is assigned a vector $H^{(0,t)} \in
+\mathbb{R}^p$ from a learned \textbf{embedding table}.  The integer
+$t$ indexes the token position; $p$ is the \textbf{hidden dimension}
+(e.g., $p = 3584$ for Qwen2.5-7B).  These initial vectors are the
+starting point for all subsequent computation.
 
 \section{The architecture}
 
-A transformer consists of $L$ identical layers.  Each layer has:
+A transformer consists of $L$ identical layers stacked sequentially.
+Each layer transforms the hidden state $H^{(l,t)} \to H^{(l+1,t)}$.
+Each layer has two main sub-components:
+
 \begin{enumerate}[nosep]
-\item \textbf{Multi-head self-attention}: each token computes a weighted
-  average of all tokens' representations.
-\item \textbf{Feed-forward network}: a two-layer MLP applied to each
-  token independently.
-\item \textbf{Residual connections}: the output is added to the input:
-  $H^{(l+1)} = H^{(l)} + \Delta H^{(l)}$.
-\item \textbf{Layer normalization}: stabilizes the scale of
-  representations.
+\item \textbf{Self-attention}: Each token ``looks at'' all other tokens
+  and computes a weighted average of their representations.  This is
+  the mechanism by which tokens communicate --- information from one
+  position can influence another.  Attention enables context-dependent
+  processing: the same word is represented differently depending on
+  its neighbours.
+
+\item \textbf{Feed-forward network (MLP)}: A two-layer neural network
+  applied to each token independently.  This is the model's
+  ``thinking'' step for each token, combining and transforming
+  features without inter-token communication.
 \end{enumerate}
 
-The hidden state $H(l, t) \in \mathbb{R}^p$ at layer $l$ and token
-position $t$ is the model's internal representation.
+Both sub-components use \textbf{residual connections}: the output is
+added to the input, $H^{(l+1)} = H^{(l)} + \Delta H^{(l)}$.  This
+means the hidden state accumulates changes layer by layer rather than
+being overwritten.  \textbf{Layer normalization} stabilizes the scale
+of representations.
+
+The hidden state $H^{(l, t)} \in \mathbb{R}^p$ at layer $l$ and token
+position $t$ is the model's internal representation --- the central
+object of this book.
+
+\section{The hidden-state grid}
+
+The full set of hidden states forms a two-dimensional grid:
+\begin{itemize}[nosep]
+\item \textbf{Layer axis}: $l = 0, 1, \ldots, L-1$, from input
+  embedding to final representation.
+\item \textbf{Token axis}: $t = 0, 1, \ldots, T-1$, from the first
+  token to the last.
+\end{itemize}
+Each grid point holds a $p$-dimensional vector.  This $(L \times T)$
+grid is the ``laboratory'' we study with GA.  Moving along the layer
+axis corresponds to the model's processing depth; moving along the
+token axis corresponds to the model's processing breadth.
 
 \section{Autoregressive prediction}
 
 GPT-style models predict the next token given all preceding tokens:
-$P(x_t \mid x_{<t})$.  The final hidden state $H(L, t)$ is projected to
-vocabulary logits, and the highest-probability token is selected.
+$P(x_t \mid x_{<t})$.  The final hidden state $H^{(L-1, t)}$ is
+projected to vocabulary logits via a learned linear map, and the
+highest-probability token is selected.  The \textbf{score}
+$s(x, u)$ of a token $u$ at the end of text $x$ is the logit
+assigned to $u$ --- this is what the dependency gradient
+(Chapter~\ref{chap:dependency}) differentiates through.
+
+\section{What gradients measure}
+
+A \textbf{gradient} is the derivative of a scalar output with respect
+to an input.  If the model's score for token ``Paris'' is
+$s$, then $\partial s / \partial H^{(l,t)}$ is a vector pointing in
+the direction of hidden-state change that most increases the score for
+``Paris'' at layer~$l$, token~$t$.  Its magnitude tells you how
+\emph{sensitive} the output is to changes at that point.
+
+In this book, we use gradients to compute \textbf{dependency density}
+(Chapter~\ref{chap:dependency}): $D_{l,t} = \|\partial s / \partial
+H^{(l,t)}\|$.  This tells us which layers and tokens matter most for
+the model's prediction --- without altering the model or its output.
 
 \section{The models we study}
 
 \begin{itemize}[nosep]
-\item \textbf{Qwen-2.5-7B}: 28 layers, hidden dimension 3584, 7 billion
-  parameters.
-\item \textbf{Qwen-2.5-32B}: 64 layers, hidden dimension 5120, 32
-  billion parameters.
+\item \textbf{Qwen2.5-7B}: 28 layers, hidden dimension 3584, 7 billion
+  parameters.  Our primary laboratory throughout the book.
+\item \textbf{Qwen2.5-32B}: 64 layers, hidden dimension 5120, 32
+  billion parameters.  Used for scaling comparisons.
 \item \textbf{DeepSeek-R1-Distill-Qwen-7B}: same architecture as
-  Qwen-7B, distilled from a larger reasoning model.
+  Qwen-7B, distilled from a larger reasoning model.  Used to study
+  how training objective affects geometric structure.
 \end{itemize}
+
+All models are freely available on Hugging Face and can be loaded with
+a single line of code (see the Preface).  A GPU with 16\,GB of memory
+is sufficient for the 7B models.
 
 
 % ══════════════════════════════════════════════════════════════════════════════
