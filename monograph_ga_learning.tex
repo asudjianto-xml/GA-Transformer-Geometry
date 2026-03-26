@@ -734,6 +734,10 @@ As the angle between two unit vectors sweeps from $0^\circ$ to $90^\circ$, the s
 \captionof{figure}{Geometric product decomposition: scalar (grade-0) vs.\
 bivector (grade-2) content as a function of angle.}
 \end{center}
+
+\medskip
+\textbf{What this tells you.}
+Perpendicular vectors produce pure bivector (all plane, no alignment), while parallel vectors produce pure scalar (all alignment, no plane). The value $1.4142 = \sqrt{2}$ for the bivector norm arises because the basis bivector $e_1 \op e_2$ has Frobenius norm $\sqrt{2}$. This scalar-vs-bivector partition is the template for every decomposition in this book: grade-0 measures ``how much,'' grade-2 measures ``in which plane.''
 \end{tryit}
 
 
@@ -1250,6 +1254,10 @@ Chapter~\ref{chap:versor} shows how to extract it from real data.
 \item Composition: $R$ (angle $0.889$), $R_2$ (angle $0.668$), $R_1 R_2$ (angle $0.983$)
 \item $R R^{-1}$ deviation from identity: $5.2 \times 10^{-16}$
 \end{itemize}
+
+\medskip
+\textbf{What this tells you.}
+The rotor preserves norms (a rotation never stretches) and rotates by exactly the requested angle. The composition is more subtle: the combined angle $0.983$ is less than the sum $0.889 + 0.668 = 1.557$. This happens because $R_1$ and $R_2$ act in \emph{different} planes --- just as walking north then east puts you closer to the origin than walking north twice. Only rotors in the \emph{same} plane add their angles. The machine-precision deviation $5.2 \times 10^{-16}$ confirms that rotor inversion is numerically exact.
 \end{tryit}
 
 
@@ -1426,6 +1434,10 @@ dominate?  Compare two prompts: does the crossover point change?
 \textbf{Sample output} (Qwen2.5-7B, 27 layer transitions):
 Peak rotation angle at layer~1 ($4.28$ rad).
 Mean grade-0 norm: $2.24$; mean grade-2 norm: $5.30$.
+
+\medskip
+\textbf{What this tells you.}
+A peak rotation of $4.28$ radians (about $245^\circ$) means the first layer nearly reverses the hidden-state direction --- a massive reorientation that encodes token identities into the model's internal coordinate system. The grade-2 norm ($5.30$) exceeding the grade-0 norm ($2.24$) tells us the network rotates more than it stretches, on average. However, as the plot below shows, the balance shifts toward grade-0 in later layers, where selective amplification matters more than reorientation.
 
 \begin{center}
 \includegraphics[width=0.85\linewidth]{figures_ga_learning/ch06_rotor_angles.pdf}
@@ -1641,6 +1653,10 @@ prediction.
 \medskip
 \textbf{Sample output} (Qwen2.5-7B):
 
+\medskip
+\textbf{What to look for.}
+Early layers have near-uniform eigenvalue spectra (effective rank close to $k$, low condition number): they treat all directions roughly equally. The final layers show condition numbers exceeding $10^3$ and effective ranks below~10, funnelling almost all energy into a handful of directions. This is the grade-0 mechanism for ``choosing'' a prediction: amplify the winning directions, suppress everything else.
+
 \begin{center}
 \includegraphics[width=0.95\linewidth]{figures_ga_learning/ch08_eigenvalue_spectra.pdf}
 \captionof{figure}{Eigenvalue spectra at early, middle, and late layers.
@@ -1817,6 +1833,10 @@ prompt type and may differ across model architectures.
 \item $\|[B_1, B_2]\|_F = 0.571$; antisymmetry: $[B_1, B_2] = -[B_2, B_1]$ \checkmark
 \item Self-commutator norm: $0.0$; Jacobi identity residual: $9.5 \times 10^{-17}$
 \end{itemize}
+
+\medskip
+\textbf{What this tells you.}
+The commutator norm $0.571$ means these two layer bivectors are significantly non-commuting --- applying their rotations in different orders produces meaningfully different outcomes. The zero self-commutator and machine-precision Jacobi residual are sanity checks confirming the algebra is consistent. In the heatmap below, look for off-diagonal blocks of high commutator norm: these identify groups of layers whose rotations interfere with each other and therefore perform jointly non-trivial computation.
 
 \begin{center}
 \includegraphics[width=0.6\linewidth]{figures_ga_learning/ch09_commutator_heatmap.pdf}
@@ -2006,6 +2026,10 @@ factual reasoning from hallucination.
 \textbf{Sample output} (Qwen2.5-7B, 14-token prompt):
 Peak curvature at layer~26 (mean curvature $= 2.46$).
 
+\medskip
+\textbf{What this tells you.}
+High curvature at the final layers means the rotor field is most ``twisted'' where the model makes its prediction. Transporting a vector around a layer-token loop at this point returns it substantially rotated, indicating that the network's layer and token transformations are strongly coupled. This is a signature of active computation: the model is not just passing information through but actively reshaping it in a way that depends jointly on layer depth and token position.
+
 \begin{center}
 \includegraphics[width=0.95\linewidth]{figures_ga_learning/ch10_holonomy.pdf}
 \captionof{figure}{Left: holonomy scalar curvature map (layer $\times$ token).
@@ -2102,6 +2126,10 @@ generalises beyond this model pair is an open question.
 \medskip
 \textbf{Sample output} (Qwen2.5-7B):
 $C_{\mathrm{acc}} = 3771.3$, concentration $= 0.205$.
+
+\medskip
+\textbf{What this tells you.}
+The accumulated capacity $C_{\mathrm{acc}} = 3771.3$ sums the non-commutativity across all adjacent layer pairs --- it is the network's total ``geometric work.'' The concentration of $0.205$ (on a 0-to-1 scale, where 1 means all capacity sits in a single layer pair) tells us computation is moderately distributed: no single transition dominates, but the load is far from uniform. The plot below reveals which transitions carry disproportionate weight, identifying the computational bottlenecks.
 
 \begin{center}
 \includegraphics[width=0.8\linewidth]{figures_ga_learning/ch11_capacity.pdf}
@@ -2213,6 +2241,10 @@ understand a failure, look at what these planes are doing.
 $D_{\mathrm{total}} = 1.74$, entropy $= 2.61$.
 Top-3 effective-work layers: 0, 1, 2 --- the earliest layers carry the
 heaviest dependency-weighted rotation.
+
+\medskip
+\textbf{What this tells you.}
+The total dependency $D_{\mathrm{total}} = 1.74$ measures the output's overall gradient sensitivity across all layers. The entropy of $2.61$ (out of a maximum of $\ln(28) \approx 3.33$ for 28 layers) indicates that sensitivity is spread across many layers but not uniformly. The surprise is that the top effective-work layers are 0, 1, and 2: the model's output depends most on the rotations in its very first layers, where the geometric reorientation is largest.
 
 \begin{center}
 \includegraphics[width=0.95\linewidth]{figures_ga_learning/ch12_dependency.pdf}
