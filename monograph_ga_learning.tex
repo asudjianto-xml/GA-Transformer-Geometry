@@ -1111,6 +1111,52 @@ R_id = rotor_compose(R, R_inv)
 print(f"R * R^-1 deviation: {R_id.deviation_from_identity():.2e}")
 \end{lstlisting}
 
+\subsection*{The Cayley map: an algebraic shortcut}
+
+The matrix logarithm gives exact bivectors but requires transcendental
+functions.  The \textbf{Cayley map} is an algebraic alternative that
+extracts the bivector generator using only addition and inversion.
+
+\begin{gabox}
+\textbf{The Cayley map.}
+Given an orthogonal matrix $U \in \mathrm{SO}(k)$ with no eigenvalue
+equal to $-1$, the skew-symmetric matrix
+\[
+  A = (U - I)(U + I)^{-1}
+\]
+is the \textbf{Cayley bivector} of $U$.  Its principal planes are the
+rotation planes of $U$, and the corresponding entries encode
+$\tan(\theta_j / 2)$ rather than $\theta_j$ itself.
+
+The scalar magnitude $\tau = \|A\|_F / \sqrt{2}$ equals $\tan(\theta/2)$
+for a single-plane rotation of angle~$\theta$.
+\end{gabox}
+
+The Cayley map is the inverse of the Cayley transform
+$U = (I - A)(I + A)^{-1}$, which maps skew-symmetric matrices to
+orthogonal matrices.  Since no logarithm or exponential is needed, the
+Cayley map is fast and numerically clean.  Its only limitation: if $U$
+has an eigenvalue of exactly~$-1$ (a~$180^\circ$ rotation), the matrix
+$U + I$ is singular and the map breaks down.
+
+\begin{lstlisting}[caption={Cayley bivector from two vectors}]
+from layer_time_ga.algebra import cayley_bivector
+
+u = H_whitened[10, 3]   # hidden state at layer 10, token 3
+v = H_whitened[11, 3]   # hidden state at layer 11, token 3
+u_hat = u / np.linalg.norm(u)
+v_hat = v / np.linalg.norm(v)
+
+biv, tau = cayley_bivector(u_hat, v_hat)
+print(f"Cayley tau = {tau:.4f}")
+print(f"Bivector norm = {biv.norm:.4f}")
+planes = biv.principal_planes(n_planes=2)
+\end{lstlisting}
+
+Chapter~\ref{chap:applications} uses the Cayley bivector to measure how
+much a specific context word steers the hidden state --- the magnitude
+$\tau$ tells you how strongly, and the bivector tells you in which plane.
+
 \subsection*{Rodrigues' formula: rotating one vector to another}
 
 There is a third construction that is especially natural when your
