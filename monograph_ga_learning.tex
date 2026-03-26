@@ -1941,6 +1941,51 @@ cos_sim /= (hr1.bivector.norm * hr2.bivector.norm + 1e-12)
 # Low similarity => model IS using context (different curvature plane)
 \end{lstlisting}
 
+\subsection{Experiment: context detection on Qwen2.5-7B}
+
+We run the Cayley bivector analysis on two prompts:
+\begin{itemize}[nosep]
+\item \textbf{Bare}: ``What is the capital of France''
+\item \textbf{With context}: ``Paris is the largest city in France and
+  serves as its capital.\ What is the capital of France''
+\end{itemize}
+For each layer $l$, we extract the last-token hidden state from both
+runs, $\ell_2$-normalise, and compute the Cayley bivector $A^{(l)}$
+and its magnitude $\tau^{(l)} = \|A^{(l)}\|_F$.
+
+\begin{center}
+\renewcommand{\arraystretch}{1.3}\small
+\begin{tabular}{@{}r r r r@{}}
+\toprule
+\textbf{Layer} & $\tau$ & $\theta$ (degrees) & $\cos(u_\pi, v_q)$ \\
+\midrule
+0 & 0.000 & 0.0 & 1.000 \\
+7 & 0.259 & 20.7 & 0.935 \\
+14 & 0.396 & 31.3 & 0.855 \\
+18 (peak) & 0.470 & 36.5 & 0.804 \\
+21 & 0.436 & 34.2 & 0.827 \\
+27 & 0.309 & 24.7 & 0.909 \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\begin{center}
+\includegraphics[width=0.8\linewidth]{figures_ga_learning/ch13_cayley_tau.pdf}
+\captionof{figure}{Steering magnitude $\tau$ across layers.  The context
+shifts the representation most strongly at layer~18 ($\tau = 0.47$),
+well above the vibe threshold $\tau = 0.05$.  Layer~0 shows $\tau = 0$
+because both prompts share the same initial embedding.}
+\end{center}
+
+\textbf{Interpretation.}
+All $\tau$ values are far above the vibe threshold of $0.05$, confirming
+the model \emph{is} using context.  The steering magnitude peaks at
+layer~18 ($\theta = 36.5^\circ$) --- the model's representation shifts
+most strongly in the middle-to-late layers.  The Cayley bivector at the
+peak layer decomposes into a dominant principal plane with angle $0.33$
+rad, identifying the specific 2D subspace where context rotates the
+representation.
+
 \begin{finding}
 \textbf{Curvature plane shift is a stronger indicator than magnitude
 change.}  Scalar curvature magnitude may change by only 10--20\%, but
@@ -2014,6 +2059,57 @@ provides plane-level diagnostics:
   curvature directions vary across tokens without coherent structure.
   The holonomy bivectors have low pairwise similarity.
 \end{itemize}
+
+\subsection{Experiment: factual vs.\ confabulation prompt}
+
+We compare the full GA profile for two prompts on Qwen2.5-7B:
+\begin{itemize}[nosep]
+\item \textbf{Factual}: ``The Eiffel Tower is a wrought iron lattice
+  tower in Paris France''
+\item \textbf{Confabulation}: ``The underwater city of Atlantis was
+  discovered in 2019 near the coast of''
+\end{itemize}
+
+\begin{center}
+\renewcommand{\arraystretch}{1.3}\small
+\begin{tabular}{@{}l r r@{}}
+\toprule
+\textbf{Metric} & \textbf{Factual} & \textbf{Confabulation} \\
+\midrule
+Mean rotation angle & 6.78 & 7.50 \\
+Max rotation angle & 8.85 & 9.96 \\
+$D_{\text{total}}$ & 3.13 & 0.75 \\
+$H(D)$ (entropy) & 2.04 & 2.36 \\
+$C_{\text{acc}}$ & 7587 & 8826 \\
+Concentration & 0.221 & 0.216 \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\begin{center}
+\includegraphics[width=0.95\linewidth]{figures_ga_learning/ch13_hallucination.pdf}
+\captionof{figure}{Geometric profile comparison: factual (blue) vs.\
+confabulation (red).  Top-left: the confabulation prompt produces
+\emph{larger} rotation angles.  Top-right: but \emph{much smaller}
+dependency --- the model does not rely on these rotations.  Bottom-left:
+effective work is concentrated in layer~0 for the factual prompt.
+Bottom-right: capacity is higher for confabulation.}
+\end{center}
+
+\textbf{Interpretation.}
+The confabulation prompt has \textbf{higher geometric activity}
+(mean rotation $7.50$ vs $6.78$, capacity $8826$ vs $7587$) but
+\textbf{4$\times$ lower dependency} ($D_{\text{total}} = 0.75$ vs
+$3.13$).  This is the ``busy but useless'' signature: the model's
+internal rotations are large and complex, but the output barely
+depends on them.  The model is churning through representations
+without arriving at a grounded answer.
+
+The factual prompt concentrates effective work in the earliest layers
+--- the model quickly builds a confident representation.  The
+confabulation prompt spreads computation more evenly (higher entropy
+$2.36$ vs $2.04$), indicating the model never settles on a coherent
+geometric path.
 
 \begin{finding}
 \textbf{Metric anisotropy complements rotational diagnostics.}
@@ -2129,6 +2225,52 @@ for l in top_layers:
           f"plane_angle={plane['angle']:.4f}")
     # plane['eigvecs'] gives the 2D subspace for intervention
 \end{lstlisting}
+
+\subsection{Experiment: identifying steering targets}
+
+Running the steering recipe on Qwen2.5-7B with the factual prompt:
+
+\begin{center}
+\renewcommand{\arraystretch}{1.3}\small
+\begin{tabular}{@{}r r r r r@{}}
+\toprule
+\textbf{Layer} & $D_l$ & $\theta^{(l)}$ &
+  $D_l \times \theta^{(l)}$ & \textbf{Top plane angle} \\
+\midrule
+0 & 1.786 & 8.831 & 15.769 & 3.131 \\
+1 & 0.106 & 8.845 & 0.935 & 3.135 \\
+2 & 0.090 & 7.948 & 0.717 & 3.131 \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+Layer~0 dominates overwhelmingly: its effective work ($15.8$) is
+$17\times$ larger than layer~1's ($0.94$).  This layer is the primary
+steering target.
+
+\paragraph{Plane independence.}
+The bivector similarity between the top-3 layers is near zero:
+\begin{center}
+\renewcommand{\arraystretch}{1.3}\small
+\begin{tabular}{@{}l r@{}}
+\toprule
+\textbf{Layer pair} & \textbf{Bivector similarity} \\
+\midrule
+Layers 0 vs 1 & $+0.005$ \\
+Layers 0 vs 2 & $+0.027$ \\
+Layers 1 vs 2 & $-0.026$ \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\textbf{Interpretation.}
+The near-zero similarities confirm that each layer rotates in an
+essentially \emph{independent} plane.  Steering at layer~0 will not
+interfere with the rotation at layers 1 or 2.  At each target layer,
+the top-3 principal planes each carry $\sim$25\% of the rotation
+weight, indicating compound (multi-plane) rotations.  A plane-specific
+intervention at layer~0 would target the dominant 2D subspace,
+modifying only 2 of $k$ dimensions --- a maximally surgical intervention.
 
 \subsection{Comparison of steering methods}
 
